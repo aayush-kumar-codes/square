@@ -32,3 +32,21 @@ customer_groups_table = Table(
     autoload_with=engine,
     schema='Square'
 )
+
+customer_address_table = Table(
+    "customer_address", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+segments_values_table = Table(
+    "customer_segments_values", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+groups_values_table = Table(
+    "customer_groups_values", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
