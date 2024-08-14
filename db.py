@@ -50,3 +50,15 @@ groups_values_table = Table(
     autoload_with=engine,
     schema='Square'
 )
+
+catalogs_table = Table(
+    "catalog", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+program_table = Table(
+    "program", metadata,
+    autoload_with=engine,
+    schema='Square'
+)

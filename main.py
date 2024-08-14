@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 
-from db import customer_address_table, customer_groups_table, customers_table, customer_preferences_table, customer_segments_table, DATABASE_URI, engine, groups_values_table, segments_values_table, SessionLocal
-from utils import save_customer_address, save_customers_data, save_customer_groups, save_customer_preferences, save_customer_segments,save_groups_data, save_segments_data
+from db import catalogs_table, customer_address_table, customer_groups_table, customers_table, customer_preferences_table, customer_segments_table, DATABASE_URI, engine, groups_values_table, program_table, segments_values_table, SessionLocal
+from utils import save_catalogs_data, save_customer_address, save_customers_data, save_customer_groups, save_customer_preferences, save_customer_segments,save_groups_data,save_program, save_segments_data
 
 
 load_dotenv()
@@ -91,6 +91,50 @@ def get_square_groups():
         with engine.connect() as conn:
             save_groups_data(groups_data, groups_values_table, conn)
             print("Groups Data Saved Successfully")      
+                
+    except SQLAlchemyError as e:
+        print(f"Database error: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred.")
+    except requests.RequestException as e:
+        print(f"Request error: {e}")
+        raise HTTPException(status_code=500, detail="Error fetching data from Square API.")
+    
+    return {"status": "success"}
+
+@app.get("/catalogs")
+def get_square_catalogs():
+    try:
+        response = requests.get(f'{SQUARE_BASE_URL}/catalog/list?types=category%2Ctax', headers=headers)
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail=response.json())
+    
+        catalogs_data = response.json().get('objects', [])
+        
+        with engine.connect() as conn:
+            save_catalogs_data(catalogs_data, catalogs_table, conn)
+            print("Catalogs Data Saved Successfully")      
+                
+    except SQLAlchemyError as e:
+        print(f"Database error: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred.")
+    except requests.RequestException as e:
+        print(f"Request error: {e}")
+        raise HTTPException(status_code=500, detail="Error fetching data from Square API.")
+    
+    return {"status": "success"}
+
+@app.get("/program")
+def get_square_program():
+    try:
+        response = requests.get(f'{SQUARE_BASE_URL}/loyalty/programs/main', headers=headers)
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail=response.json())
+    
+        program = response.json().get('program', {})
+        
+        with engine.connect() as conn:
+            save_program(program, program_table, conn)
+            print("Program Data Saved Successfully")      
                 
     except SQLAlchemyError as e:
         print(f"Database error: {e}")

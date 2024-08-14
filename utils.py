@@ -171,3 +171,54 @@ def save_groups_data(groups_data, groups_values_table, conn):
         stmt = insert(groups_values_table).values(group_data)
         conn.execute(stmt)
         conn.commit()
+
+def save_catalogs_data(catalogs_data, catalogs_table, conn):
+    for catalog in catalogs_data:
+        catalog_id = catalog.get('id')
+        
+        # Check if the catalog already exists in the database
+        existing_catalog = conn.execute(
+            select(catalogs_table.c.catalog_id).where(catalogs_table.c.catalog_id == catalog_id)
+        ).fetchone()
+        
+        if existing_catalog:
+            continue
+
+        catalog_data = {
+            'catalog_id': catalog_id,
+            'type': catalog.get('type'),
+            'created_at': catalog.get('created_at'),
+            'updated_at': catalog.get('updated_at'),
+            'version': catalog.get('version'),
+            'is_deleted': catalog.get('is_deleted'),
+            'present_at_all_locations': catalog.get('present_at_all_locations')
+        }
+        
+        stmt = insert(catalogs_table).values(catalog_data)
+        conn.execute(stmt)
+        conn.commit()
+
+def save_program(program, program_table, conn):
+    program_id = program.get("id")
+    location_ids = program.get("location_ids", [])
+
+    for location_id in location_ids:
+        # Check if the program location id already exists in the database 
+        existing_location_id = conn.execute(
+            select(program_table.c.location_id).where(program_table.c.id == program_id, program_table.c.location_id == location_id)
+        ).fetchone()
+        
+        if existing_location_id:
+            continue
+
+        program_data ={
+            "id": program_id,
+            "status": program.get("status"),
+            "location_id": location_id,
+            "created_at": program.get("created_at"),
+            "updated_at": program.get("updated_at")
+        }
+
+        stmt = insert(program_table).values(program_data)
+        conn.execute(stmt)
+        conn.commit()
