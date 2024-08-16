@@ -1,3 +1,4 @@
+import json
 from sqlalchemy import insert, select
 
 def save_customers_data(customers_data, customers_table, conn):
@@ -220,5 +221,93 @@ def save_program(program, program_table, conn):
         }
 
         stmt = insert(program_table).values(program_data)
+        conn.execute(stmt)
+        conn.commit()
+
+def save_loyalty_accounts(loyalty_accounts, loyalty_accounts_table, loyalty_accounts_mapping_table, conn):
+    for loyalty_account in loyalty_accounts:
+        customer_id = loyalty_account.get("customer_id")
+        mapping = loyalty_account.get("mapping")
+
+        # Check if the loyalty account already exists in the database 
+        existing_loyalty_account = conn.execute(
+            select(loyalty_accounts_table.c.customer_id).where(loyalty_accounts_table.c.customer_id == customer_id)
+        ).fetchone()
+        
+        if existing_loyalty_account:
+            continue
+
+        loyalty_account_data = {
+            "id": loyalty_account.get("id"),
+            "program_id": loyalty_account.get("program_id"),
+            "balance": loyalty_account.get("balance"),
+            "lifetime_points": loyalty_account.get("lifetime_points"),
+            "customer_id": loyalty_account.get("customer_id"),
+            "enrolled_at": loyalty_account.get("enrolled_at"),
+            "created_at": loyalty_account.get("created_at"),
+            "updated_at": loyalty_account.get("updated_at")
+        }
+
+        loyalty_accounts_mapping_data = {
+            "id": mapping.get("id"),
+            "created_at": mapping.get("created_at"),
+            "phone_number": mapping.get("phone_number")
+        }
+
+        stmt = insert(loyalty_accounts_table).values(loyalty_account_data)
+        stmt2 = insert(loyalty_accounts_mapping_table).values(loyalty_accounts_mapping_data)
+        conn.execute(stmt)
+        conn.execute(stmt2)
+        conn.commit()
+
+
+def save_loyalty_events(loyalty_events, loyalty_events_table, conn):
+    for loyalty_event in loyalty_events:
+        event_id = loyalty_event.get("id")
+
+        # Check if the loyalty event already exists in the database 
+        existing_loyalty_event = conn.execute(
+            select(loyalty_events_table.c.id).where(loyalty_events_table.c.id == event_id)
+        ).fetchone()
+        
+        if existing_loyalty_event:
+            continue
+
+        loyalty_event_data = {
+            "id": loyalty_event.get("id"),
+            "type": loyalty_event.get("type"),
+            "created_at": loyalty_event.get("created_at"),
+            "loyalty_account_id": loyalty_event.get("loyalty_account_id"),
+            "location_id": loyalty_event.get("location_id"),
+            "source": loyalty_event.get("source"),
+            "type_info": json.dumps(loyalty_event.get(loyalty_event.get("type").lower()))
+        }
+
+        stmt = insert(loyalty_events_table).values(loyalty_event_data)
+        conn.execute(stmt)
+        conn.commit()
+
+def save_orders(orders, orders_table, conn):
+    for order in orders:
+        order_id = order.get("order_id")
+
+        # Check if the order already exists in the database 
+        existing_order = conn.execute(
+            select(orders_table.c.order_id).where(orders_table.c.order_id == order_id)
+        ).fetchone()
+        
+        if existing_order:
+            continue
+
+        order_data = {
+            "order_id": order.get("order_id"),
+            "version": order.get("version"),
+            "location_id": order.get("location_id"),
+            "source": order.get("source"),
+            "created_at": order.get("created_at"),
+            "updated_at": order.get("updated_at"),
+        }
+
+        stmt = insert(orders_table).values(order_data)
         conn.execute(stmt)
         conn.commit()

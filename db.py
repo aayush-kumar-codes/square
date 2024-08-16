@@ -62,3 +62,27 @@ program_table = Table(
     autoload_with=engine,
     schema='Square'
 )
+
+loyalty_accounts_table = Table(
+    "loyalty_accounts", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+loyalty_accounts_mapping_table = Table(
+    "loyalty_accounts_mapping", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+loyalty_events_table = Table(
+    "loyalty_events", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+orders_table = Table(
+    "orders", metadata,
+    autoload_with=engine,
+    schema='Square'
+)

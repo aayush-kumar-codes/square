@@ -2,11 +2,11 @@ import os
 
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from sqlalchemy.exc import SQLAlchemyError
 
-from db import catalogs_table, customer_address_table, customer_groups_table, customers_table, customer_preferences_table, customer_segments_table, DATABASE_URI, engine, groups_values_table, program_table, segments_values_table, SessionLocal
-from utils import save_catalogs_data, save_customer_address, save_customers_data, save_customer_groups, save_customer_preferences, save_customer_segments,save_groups_data,save_program, save_segments_data
+from db import catalogs_table, customer_address_table, customer_groups_table, customers_table, customer_preferences_table, customer_segments_table, DATABASE_URI, engine,loyalty_accounts_table, loyalty_accounts_mapping_table, loyalty_events_table, groups_values_table,orders_table, program_table, segments_values_table, SessionLocal
+from utils import save_catalogs_data, save_customer_address, save_customers_data, save_customer_groups, save_customer_preferences, save_customer_segments,save_groups_data, save_loyalty_accounts, save_loyalty_events,save_orders, save_program, save_segments_data
 
 
 load_dotenv()
@@ -135,6 +135,79 @@ def get_square_program():
         with engine.connect() as conn:
             save_program(program, program_table, conn)
             print("Program Data Saved Successfully")      
+                
+    except SQLAlchemyError as e:
+        print(f"Database error: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred.")
+    except requests.RequestException as e:
+        print(f"Request error: {e}")
+        raise HTTPException(status_code=500, detail="Error fetching data from Square API.")
+    
+    return {"status": "success"}
+
+@app.post("/loyalty-accounts")
+async def get_square_loyalty_accounts(request: Request):
+    try:
+        body = await request.json()
+        response = requests.post(f'{SQUARE_BASE_URL}/loyalty/accounts/search', headers=headers, json=body)
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail=response.json())
+    
+        loyalty_accounts = response.json().get("loyalty_accounts", [])
+        
+        with engine.connect() as conn:
+            save_loyalty_accounts(loyalty_accounts, loyalty_accounts_table, loyalty_accounts_mapping_table, conn)
+            print("Loyalty Accounts Data Saved Successfully")      
+                
+    except SQLAlchemyError as e:
+        print(f"Database error: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred.")
+    except requests.RequestException as e:
+        print(f"Request error: {e}")
+        raise HTTPException(status_code=500, detail="Error fetching data from Square API.")
+    
+    return {"status": "success"}
+
+@app.post("/loyalty-events")
+async def get_square_loyalty_events(request: Request):
+    try:
+        body = await request.json()
+        response = requests.post(f'{SQUARE_BASE_URL}/loyalty/events/search', headers=headers, json=body)
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail=response.json())
+    
+        loyalty_events = response.json().get("events", [])
+        
+        with engine.connect() as conn:
+            save_loyalty_events(loyalty_events, loyalty_events_table, conn)
+            print("Loyalty Events Data Saved Successfully")      
+                
+    except SQLAlchemyError as e:
+        print(f"Database error: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred.")
+    except requests.RequestException as e:
+        print(f"Request error: {e}")
+        raise HTTPException(status_code=500, detail="Error fetching data from Square API.")
+    
+    return {"status": "success"}
+
+@app.post("/orders")
+async def get_square_orders(request: Request):
+    try:
+        response = requests.get(f'{SQUARE_BASE_URL}/locations', headers=headers)
+        data = response.json()
+        location_ids = [location['id'] for location in data['locations'][:10]]
+        body = await request.json()
+        body["location_ids"] = location_ids
+        response = requests.post(f'{SQUARE_BASE_URL}/orders/search', headers=headers, json=body)
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail=response.json())
+    
+        orders = response.json().get("order_entries", [])
+        
+        with engine.connect() as conn:
+            save_orders(orders, orders_table, conn)
+            print("Orders Data Saved Successfully")      
                 
     except SQLAlchemyError as e:
         print(f"Database error: {e}")
