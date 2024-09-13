@@ -57,20 +57,68 @@ catalogs_table = Table(
     schema='Square'
 )
 
-program_table = Table(
-    "program", metadata,
+catalog_category_table = Table(
+    "catalog_category", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+catalog_discount_table = Table(
+    "catalog_discount", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+catalog_item_table = Table(
+    "catalog_item", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+catalog_item_modifiers_table = Table(
+    "catalog_item_modifiers", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+catalog_item_option_table = Table(
+    "catalog_item_option", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+catalog_item_option_values_table = Table(
+    "catalog_item_option_values", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+catalog_item_variation_table = Table(
+    "catalog_item_variation", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+loyalty_program_table = Table(
+    "loyalty_program", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+loyalty_program_locations_table = Table(
+    "loyalty_program_locations", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+loyalty_program_reward_tiers_table = Table(
+    "loyalty_program_reward_tiers", metadata,
     autoload_with=engine,
     schema='Square'
 )
 
 loyalty_accounts_table = Table(
     "loyalty_accounts", metadata,
-    autoload_with=engine,
-    schema='Square'
-)
-
-loyalty_accounts_mapping_table = Table(
-    "loyalty_accounts_mapping", metadata,
     autoload_with=engine,
     schema='Square'
 )
@@ -83,6 +131,30 @@ loyalty_events_table = Table(
 
 orders_table = Table(
     "orders", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+orders_discounts_table = Table(
+    'orders_discounts', metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+orders_line_items_table = Table(
+    'orders_line_items', metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+order_line_items_applied_discounts_table = Table(
+    'orders_line_items_applied_discounts', metadata,
+    autoload_with=engine,
+    schema='Square'
+)
+
+order_line_items_modifiers_table = Table(
+    'orders_line_items_modifiers', metadata,
     autoload_with=engine,
     schema='Square'
 )

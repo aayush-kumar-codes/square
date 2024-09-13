@@ -5,8 +5,45 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from sqlalchemy.exc import SQLAlchemyError
 
-from db import catalogs_table, customer_address_table, customer_groups_table, customers_table, customer_preferences_table, customer_segments_table, DATABASE_URI, engine,loyalty_accounts_table, loyalty_accounts_mapping_table, loyalty_events_table, groups_values_table,orders_table, program_table, segments_values_table, SessionLocal
-from utils import save_catalogs_data, save_customer_address, save_customers_data, save_customer_groups, save_customer_preferences, save_customer_segments,save_groups_data, save_loyalty_accounts, save_loyalty_events,save_orders, save_program, save_segments_data
+from db import (catalogs_table,
+               customer_address_table,
+               customer_groups_table,
+               customers_table,
+               customer_preferences_table,
+               customer_segments_table,
+               engine,
+               groups_values_table,
+               loyalty_accounts_table,
+               loyalty_events_table,
+               orders_table,
+               loyalty_program_locations_table,
+               loyalty_program_reward_tiers_table,
+               loyalty_program_table,
+               segments_values_table,
+
+               orders_discounts_table,
+               orders_line_items_table,
+               order_line_items_applied_discounts_table,
+               order_line_items_modifiers_table,
+)
+from utils import (save_catalog_type_data,
+                   save_catalogs_data,
+                   save_customer_address,
+                   save_customer_groups,
+                   save_customer_preferences,
+                   save_customer_segments,
+                   save_customers_data,
+                   save_groups_data,
+                   save_loyalty_accounts,
+                   save_loyalty_events,
+                   save_orders,
+                   save_program,
+                   save_segments_data,
+                   orders_discounts_data,
+                   save_orders_line_items_data,
+                   save_orders_line_items_applied_discounts_data,
+                   save_orders_line_items_modifiers_data
+)
 
 
 load_dotenv()
@@ -101,10 +138,14 @@ def get_square_groups():
     
     return {"status": "success"}
 
-@app.get("/catalogs")
-def get_square_catalogs():
+@app.post("/catalogs")
+async def get_square_catalogs(request: Request):
+    body = await request.json()
+    type = body.get("type")
+    if type not in ['item','category','tax','discount','modifier','item_option','item_option_val','item_variation']:
+        return {"error": "Unknown type","accepted_type": ['item','category','tax','discount','modifier','item_option','item_option_val','item_variation']}
     try:
-        response = requests.get(f'{SQUARE_BASE_URL}/catalog/list?types=category%2Ctax', headers=headers)
+        response = requests.get(f'{SQUARE_BASE_URL}/catalog/list?types={type}', headers=headers)
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail=response.json())
     
@@ -123,8 +164,35 @@ def get_square_catalogs():
     
     return {"status": "success"}
 
-@app.get("/program")
-def get_square_program():
+@app.post("/catalog-type")
+async def get_square_catalog_type(request: Request):
+    body = await request.json()
+    type = body.get("type")
+    if type not in ['category','discount','item','modifier','item_option','item_option_val','item_variation']:
+        return {"error": "Unknown type", "accepted_type": ['category','discount','item','modifier','item_option','item_option_val','item_variation'] }
+
+    try:
+        response = requests.get(f'{SQUARE_BASE_URL}/catalog/list?types={type}', headers=headers)
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail=response.json())
+    
+        catalog_type_data = response.json().get('objects', [])
+        
+        with engine.connect() as conn:
+            save_catalog_type_data(catalog_type_data, type, conn)
+            print("Catalog Type Data Saved Successfully")      
+                
+    except SQLAlchemyError as e:
+        print(f"Database error: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred.")
+    except requests.RequestException as e:
+        print(f"Request error: {e}")
+        raise HTTPException(status_code=500, detail="Error fetching data from Square API.")
+    
+    return {"status": "success"}
+
+@app.get("/loyalty-program")
+def get_square_loyalty_program():
     try:
         response = requests.get(f'{SQUARE_BASE_URL}/loyalty/programs/main', headers=headers)
         if response.status_code != 200:
@@ -133,7 +201,7 @@ def get_square_program():
         program = response.json().get('program', {})
         
         with engine.connect() as conn:
-            save_program(program, program_table, conn)
+            save_program(program, loyalty_program_table, loyalty_program_locations_table, loyalty_program_reward_tiers_table, conn)
             print("Program Data Saved Successfully")      
                 
     except SQLAlchemyError as e:
@@ -156,7 +224,7 @@ async def get_square_loyalty_accounts(request: Request):
         loyalty_accounts = response.json().get("loyalty_accounts", [])
         
         with engine.connect() as conn:
-            save_loyalty_accounts(loyalty_accounts, loyalty_accounts_table, loyalty_accounts_mapping_table, conn)
+            save_loyalty_accounts(loyalty_accounts, loyalty_accounts_table, conn)
             print("Loyalty Accounts Data Saved Successfully")      
                 
     except SQLAlchemyError as e:
@@ -177,6 +245,7 @@ async def get_square_loyalty_events(request: Request):
             raise HTTPException(status_code=response.status_code, detail=response.json())
     
         loyalty_events = response.json().get("events", [])
+        loyalty_events = [item for item in loyalty_events if 'create_reward' in item]
         
         with engine.connect() as conn:
             save_loyalty_events(loyalty_events, loyalty_events_table, conn)
@@ -191,23 +260,44 @@ async def get_square_loyalty_events(request: Request):
     
     return {"status": "success"}
 
-@app.post("/orders")
-async def get_square_orders(request: Request):
+@app.get("/orders")
+async def get_square_orders():
     try:
         response = requests.get(f'{SQUARE_BASE_URL}/locations', headers=headers)
         data = response.json()
         location_ids = [location['id'] for location in data['locations'][:10]]
-        body = await request.json()
+        body = {}
         body["location_ids"] = location_ids
         response = requests.post(f'{SQUARE_BASE_URL}/orders/search', headers=headers, json=body)
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail=response.json())
     
-        orders = response.json().get("order_entries", [])
+        orders = response.json().get("orders", [])
+
+        #sliced_orders = orders[20:80]
+
+        #return {"orders": orders}
+       
+        #print("Full Orders Response:", response.json())
+       
         
         with engine.connect() as conn:
+            
             save_orders(orders, orders_table, conn)
-            print("Orders Data Saved Successfully")      
+            print("Orders Data Saved Successfully")     
+
+            orders_discounts_data(orders, orders_discounts_table, conn)
+            print("Orders Discounts Data Saved Successfully")
+
+            save_orders_line_items_data(orders, orders_line_items_table, conn)
+            print("Orders Line Items Data Saved Successfully")
+
+            save_orders_line_items_applied_discounts_data(orders, order_line_items_applied_discounts_table, conn)
+            print("Orders Line Items Applied Discounts Data Saved Successfully")
+
+            save_orders_line_items_modifiers_data(orders, order_line_items_modifiers_table, conn)
+            print("Orders Line Items Modifiers Data Saved Successfully")
+
                 
     except SQLAlchemyError as e:
         print(f"Database error: {e}")
