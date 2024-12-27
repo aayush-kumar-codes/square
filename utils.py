@@ -1,7 +1,16 @@
 import json
+
 from sqlalchemy import insert, select
 
-from db import catalog_category_table, catalog_discount_table, catalog_item_table, catalog_item_modifiers_table, catalog_item_option_table, catalog_item_option_values_table, catalog_item_variation_table
+from db import (
+    catalog_category_table,
+    catalog_discount_table,
+    catalog_item_modifiers_table,
+    catalog_item_option_table,
+    catalog_item_option_values_table,
+    catalog_item_table,
+    catalog_item_variation_table
+)
 
 
 def save_customers_data(customers_data, customers_table, conn):
@@ -583,6 +592,7 @@ def save_orders(orders, orders_table, conn):
         tender = order.get('tenders', [{}])[0]  
         customer_id = tender.get('customer_id')
         tender_type = tender.get('type')
+        tender_processing_fee_money = tender.get('processing_fee_money')
 
         order_id = order.get("id")
 
@@ -598,6 +608,16 @@ def save_orders(orders, orders_table, conn):
                 "refund_amount_money_currency": refund.get("amount_money", {}).get("currency"),
                 "refund_status": refund.get("status"),
             }
+        if tender_processing_fee_money:
+            processing_fee_money_data = {
+                "amount" : tender_processing_fee_money.get("amount"),
+                "currency" : tender_processing_fee_money.get("currency")
+            }
+        else:
+            processing_fee_money_data = {
+                "amount" : None,
+                "currency" : None
+            }
 
         # Handle returns data to get source order ID
         returns = order.get("returns", [])
@@ -609,7 +629,6 @@ def save_orders(orders, orders_table, conn):
         
         # Check if the order already exists in the database 
         existing_order = conn.execute(
-            #select(orders_table.c.order_id).where(orders_table.c.order_id == order_id)
             select(orders_table.c.id).where(orders_table.c.id == order_id)
         ).fetchone()
 
@@ -642,6 +661,9 @@ def save_orders(orders, orders_table, conn):
         "refund_amount_money_currency": refund_data.get("refund_amount_money_currency"),
         "refund_status": refund_data.get("refund_status"),
         "type": tender_type,
+
+        "processing_fee_money_amount" : processing_fee_money_data.get("amount"),
+        "processing_fee_money_currency" : processing_fee_money_data.get("currency"),
     }
         
         stmt = insert(orders_table).values(order_data)
@@ -858,3 +880,32 @@ def save_orders_line_items_modifiers_data(orders, order_line_items_modifiers_tab
 
                 except Exception as e:
                     print(f"Error processing modifier with UID {modifier_data['modifier_uid']} for order ID {modifier_data['order_id']}: {e}")
+
+def save_locations_data(locations_data,locations_table,conn):
+    for location in locations_data:
+        location_id = location.get('id')
+        
+        # Check if the location already exists in the database
+        existing_location = conn.execute(
+            select(locations_table.c.id).where(locations_table.c.id == location_id)
+        ).fetchone()
+        
+        if existing_location:
+            continue
+
+        location_data = {
+            'id': location.get('id'),
+            'name': location.get('name'),
+            'address_address_line_1': location.get('address').get('address_line_1'),
+            'address_locality': location.get('address').get('locality'),
+            'address_administrative_district_level_1': location.get('address').get('administative_district_level'),
+            'address_postal_code': location.get('address').get('postal_code'),
+            'address_country': location.get('address').get('country'),
+            'status': location.get('status'),
+            'created_at': location.get('created_at'),
+            'merchant_id': location.get('merchant_id')
+        }
+        
+        stmt = insert(locations_table).values(location_data)
+        conn.execute(stmt)
+        conn.commit()

@@ -5,44 +5,47 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from sqlalchemy.exc import SQLAlchemyError
 
-from db import (catalogs_table,
-               customer_address_table,
-               customer_groups_table,
-               customers_table,
-               customer_preferences_table,
-               customer_segments_table,
-               engine,
-               groups_values_table,
-               loyalty_accounts_table,
-               loyalty_events_table,
-               orders_table,
-               loyalty_program_locations_table,
-               loyalty_program_reward_tiers_table,
-               loyalty_program_table,
-               segments_values_table,
-
-               orders_discounts_table,
-               orders_line_items_table,
-               order_line_items_applied_discounts_table,
-               order_line_items_modifiers_table,
+from db import (
+    catalogs_table,
+    customer_address_table,
+    customer_groups_table,
+    customer_preferences_table,
+    customer_segments_table,
+    customers_table,
+    engine,
+    groups_values_table,
+    locations_table,
+    loyalty_accounts_table,
+    loyalty_events_table,
+    loyalty_program_locations_table,
+    loyalty_program_reward_tiers_table,
+    loyalty_program_table,
+    orders_discounts_table,
+    order_line_items_applied_discounts_table,
+    order_line_items_modifiers_table,
+    orders_line_items_table,
+    orders_table,
+    segments_values_table,
 )
-from utils import (save_catalog_type_data,
-                   save_catalogs_data,
-                   save_customer_address,
-                   save_customer_groups,
-                   save_customer_preferences,
-                   save_customer_segments,
-                   save_customers_data,
-                   save_groups_data,
-                   save_loyalty_accounts,
-                   save_loyalty_events,
-                   save_orders,
-                   save_program,
-                   save_segments_data,
-                   orders_discounts_data,
-                   save_orders_line_items_data,
-                   save_orders_line_items_applied_discounts_data,
-                   save_orders_line_items_modifiers_data
+from utils import (
+    orders_discounts_data,
+    save_catalog_type_data,
+    save_catalogs_data,
+    save_customer_address,
+    save_customer_groups,
+    save_customer_preferences,
+    save_customer_segments,
+    save_customers_data,
+    save_groups_data,
+    save_locations_data,
+    save_loyalty_accounts,
+    save_loyalty_events,
+    save_orders,
+    save_orders_line_items_applied_discounts_data,
+    save_orders_line_items_data,
+    save_orders_line_items_modifiers_data,
+    save_program,
+    save_segments_data,
 )
 
 
@@ -141,11 +144,11 @@ def get_square_groups():
 @app.post("/catalogs")
 async def get_square_catalogs(request: Request):
     body = await request.json()
-    type = body.get("type")
-    if type not in ['item','category','tax','discount','modifier','item_option','item_option_val','item_variation']:
+    types = body.get("types")
+    if types not in ['item','category','tax','discount','modifier','item_option','item_option_val','item_variation']:
         return {"error": "Unknown type","accepted_type": ['item','category','tax','discount','modifier','item_option','item_option_val','item_variation']}
     try:
-        response = requests.get(f'{SQUARE_BASE_URL}/catalog/list?types={type}', headers=headers)
+        response = requests.get(f'{SQUARE_BASE_URL}/catalog/list?types={types}', headers=headers)
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail=response.json())
     
@@ -167,12 +170,12 @@ async def get_square_catalogs(request: Request):
 @app.post("/catalog-type")
 async def get_square_catalog_type(request: Request):
     body = await request.json()
-    type = body.get("type")
-    if type not in ['category','discount','item','modifier','item_option','item_option_val','item_variation']:
+    types = body.get("types")
+    if types not in ['category','discount','item','modifier','item_option','item_option_val','item_variation']:
         return {"error": "Unknown type", "accepted_type": ['category','discount','item','modifier','item_option','item_option_val','item_variation'] }
 
     try:
-        response = requests.get(f'{SQUARE_BASE_URL}/catalog/list?types={type}', headers=headers)
+        response = requests.get(f'{SQUARE_BASE_URL}/catalog/list?types={types}', headers=headers)
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail=response.json())
     
@@ -266,20 +269,37 @@ async def get_square_orders():
         response = requests.get(f'{SQUARE_BASE_URL}/locations', headers=headers)
         data = response.json()
         location_ids = [location['id'] for location in data['locations'][:10]]
-        body = {}
-        body["location_ids"] = location_ids
+        
+        start_date = ""
+        end_date = ""
+        body = {
+            "location_ids": [
+                location_ids
+            ],
+            "limit": 1000,
+            "return_entries": False,
+            "query": {
+                "sort": {
+                    "sort_field": "UPDATED_AT",
+                    "sort_order": "ASC"
+                    },
+                "filter": {
+                    "date_time_filter": {
+                        "created_at": {
+                            "start_at": start_date,
+                            "end_at": end_date
+                        }
+                    }
+                }
+            }
+        }
+        
         response = requests.post(f'{SQUARE_BASE_URL}/orders/search', headers=headers, json=body)
         if response.status_code != 200:
             raise HTTPException(status_code=response.status_code, detail=response.json())
     
         orders = response.json().get("orders", [])
-
-        #sliced_orders = orders[20:80]
-
-        #return {"orders": orders}
-       
-        #print("Full Orders Response:", response.json())
-       
+        print(len(orders))
         
         with engine.connect() as conn:
             
@@ -308,7 +328,22 @@ async def get_square_orders():
     
     return {"status": "success"}
 
-# Start the FastAPI app
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8009)
+@app.get("/locations")
+async def get_locations():
+    try:
+        response = requests.get(f'{SQUARE_BASE_URL}/locations', headers=headers)
+        if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail=response.json())
+        locations_data=response.json().get("locations")
+        with engine.connect() as conn:
+                save_locations_data(locations_data, locations_table, conn)
+                print("Locations Data Saved Successfully")
+    except SQLAlchemyError as e:
+        print(f"Database error: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred.")
+    except requests.RequestException as e:
+        print(f"Request error: {e}")
+        raise HTTPException(status_code=500, detail="Error fetching data from Square API.")
+    
+    return {"status": "success"}
+

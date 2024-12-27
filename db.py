@@ -158,3 +158,9 @@ order_line_items_modifiers_table = Table(
     autoload_with=engine,
     schema='Square'
 )
+
+locations_table = Table(
+    "locations", metadata,
+    autoload_with=engine,
+    schema='Square'
+)
